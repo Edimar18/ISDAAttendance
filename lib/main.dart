@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'db_helper.dart';
 import 'participants_page.dart';
+import 'attendance_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -71,9 +72,11 @@ class _EventsPageState extends State<EventsPage> {
     _refreshEvents();
   }
 
-  Future<void> _toggleAttendance(Event event) async {
-    final updatedEvent = event.copyWith(isRecorded: !event.isRecorded);
-    await DatabaseHelper.instance.update(updatedEvent);
+  void _navigateToAttendance(Event event) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AttendancePage(event: event)),
+    );
     _refreshEvents();
   }
 
@@ -139,7 +142,7 @@ class _EventsPageState extends State<EventsPage> {
                     ],
                   ),
                   child: GestureDetector(
-                    onTap: () => _toggleAttendance(event),
+                    onTap: () => _navigateToAttendance(event),
                     child: EventCard(
                       title: event.title,
                       tag: event.type,

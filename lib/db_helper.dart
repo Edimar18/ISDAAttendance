@@ -85,6 +85,44 @@ class Participant {
   }
 }
 
+class AttendanceRecord {
+  final int? id;
+  final int eventId;
+  final int participantId;
+  final DateTime timeIn;
+  final DateTime? timeOut;
+  final Participant? participant; // Joined data
+
+  AttendanceRecord({
+    this.id,
+    required this.eventId,
+    required this.participantId,
+    required this.timeIn,
+    this.timeOut,
+    this.participant,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'event_id': eventId,
+      'participant_id': participantId,
+      'time_in': timeIn.toIso8601String(),
+      'time_out': timeOut?.toIso8601String(),
+    };
+  }
+  
+  factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
+     return AttendanceRecord(
+        id: map['id'],
+        eventId: map['event_id'],
+        participantId: map['participant_id'],
+        timeIn: DateTime.parse(map['time_in']),
+        timeOut: map['time_out'] != null ? DateTime.parse(map['time_out']) : null,
+     );
+  }
+}
+
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
@@ -103,7 +141,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -113,6 +151,7 @@ class DatabaseHelper {
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
     const textType = 'TEXT NOT NULL';
     const boolType = 'INTEGER NOT NULL';
+    const intType = 'INTEGER NOT NULL';
 
     await db.execute('''
 CREATE TABLE events ( 
@@ -132,19 +171,46 @@ CREATE TABLE participants (
   year $textType
 )
 ''');
+
+    await db.execute('''
+CREATE TABLE attendance (
+  id $idType,
+  event_id $intType,
+  participant_id $intType,
+  time_in $textType,
+  time_out TEXT,
+  FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
+  FOREIGN KEY (participant_id) REFERENCES participants (id) ON DELETE CASCADE
+)
+''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    const textType = 'TEXT NOT NULL';
+    const intType = 'INTEGER NOT NULL';
+
     if (oldVersion < 2) {
-      const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-      const textType = 'TEXT NOT NULL';
-      
       await db.execute('''
 CREATE TABLE participants (
   id $idType,
   name $textType,
   course $textType,
   year $textType
+)
+''');
+    }
+    
+    if (oldVersion < 3) {
+      await db.execute('''
+CREATE TABLE attendance (
+  id $idType,
+  event_id $intType,
+  participant_id $intType,
+  time_in $textType,
+  time_out TEXT,
+  FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE CASCADE,
+  FOREIGN KEY (participant_id) REFERENCES participants (id) ON DELETE CASCADE
 )
 ''');
     }
@@ -177,8 +243,28 @@ CREATE TABLE participants (
 
   Future<List<Event>> readAllEvents() async {
     final db = await instance.database;
+    
+    // We can do a manual join or just update isRecorded flag based on attendance count query for each event
+    // But for simplicity, let's just fetch events and let the UI decide based on querying attendance count if needed,
+    // OR, we can assume 'isRecorded' column is the source of truth if we update it.
+    // However, the requirement says "it should be based on the attendance record on the event".
+    // So let's add a method to check if event has attendance.
+    
     final result = await db.query('events', orderBy: 'date DESC');
-    return result.map((json) => Event.fromMap(json)).toList();
+    
+    List<Event> events = result.map((json) => Event.fromMap(json)).toList();
+    
+    // Option: Verify 'isRecorded' consistency.
+    // For now, let's just return events. We will dynamically check attendance status in UI or another method.
+    
+    return events;
+  }
+  
+  Future<bool> hasAttendanceRecords(int eventId) async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM attendance WHERE event_id = ?', [eventId]);
+    int count = Sqflite.firstIntValue(result) ?? 0;
+    return count > 0;
   }
 
   Future<int> update(Event event) async {
@@ -228,6 +314,84 @@ CREATE TABLE participants (
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+  
+  // --- Attendance CRUD ---
+  
+  Future<AttendanceRecord> addAttendance(int eventId, int participantId, DateTime timeIn) async {
+    final db = await instance.database;
+    final record = AttendanceRecord(
+        eventId: eventId, 
+        participantId: participantId, 
+        timeIn: timeIn
+    );
+    final id = await db.insert('attendance', record.toMap());
+    
+    // Update event isRecorded flag
+    await db.update('events', {'isRecorded': 1}, where: 'id = ?', whereArgs: [eventId]);
+    
+    return AttendanceRecord(
+        id: id, 
+        eventId: eventId, 
+        participantId: participantId, 
+        timeIn: timeIn
+    );
+  }
+  
+  Future<List<AttendanceRecord>> getAttendanceForEvent(int eventId) async {
+      final db = await instance.database;
+      
+      // Perform join
+      final result = await db.rawQuery('''
+        SELECT a.*, p.name, p.course, p.year 
+        FROM attendance a
+        INNER JOIN participants p ON a.participant_id = p.id
+        WHERE a.event_id = ?
+        ORDER BY a.time_in DESC
+      ''', [eventId]);
+      
+      return result.map((row) {
+          final participant = Participant(
+              id: row['participant_id'] as int,
+              name: row['name'] as String,
+              course: row['course'] as String,
+              year: row['year'] as String,
+          );
+          
+          return AttendanceRecord(
+              id: row['id'] as int,
+              eventId: row['event_id'] as int,
+              participantId: row['participant_id'] as int,
+              timeIn: DateTime.parse(row['time_in'] as String),
+              timeOut: row['time_out'] != null ? DateTime.parse(row['time_out'] as String) : null,
+              participant: participant
+          );
+      }).toList();
+  }
+  
+  Future<void> updateTimeOut(int attendanceId, DateTime timeOut) async {
+      final db = await instance.database;
+      await db.update(
+          'attendance', 
+          {'time_out': timeOut.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [attendanceId]
+      );
+  }
+  
+  Future<void> timeOutAll(int eventId, DateTime timeOut) async {
+      final db = await instance.database;
+      await db.update(
+          'attendance',
+          {'time_out': timeOut.toIso8601String()},
+          where: 'event_id = ? AND time_out IS NULL',
+          whereArgs: [eventId]
+      );
+  }
+  
+  Future<void> deleteAttendance(int attendanceId) async {
+      final db = await instance.database;
+      await db.delete('attendance', where: 'id = ?', whereArgs: [attendanceId]);
   }
 
   Future close() async {
