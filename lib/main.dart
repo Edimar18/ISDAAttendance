@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'db_helper.dart';
+import 'participants_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -84,7 +85,15 @@ class _EventsPageState extends State<EventsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.cloud_off, color: Colors.grey)),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ParticipantsPage()),
+              );
+            },
+            icon: const Icon(Icons.person_add, color: Colors.white),
+          ),
           IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
         ],
       ),
@@ -193,7 +202,7 @@ class _AddEventModalState extends State<AddEventModal> {
     'Scholar Meeting',
     'Seminar',
     'Workshop',
-    'Fundraising'
+    'Fundraising',
     'Other',
   ];
 

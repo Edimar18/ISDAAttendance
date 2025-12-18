@@ -53,6 +53,38 @@ class Event {
   }
 }
 
+class Participant {
+  final int? id;
+  final String name;
+  final String course;
+  final String year;
+
+  Participant({
+    this.id,
+    required this.name,
+    required this.course,
+    required this.year,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'course': course,
+      'year': year,
+    };
+  }
+
+  factory Participant.fromMap(Map<String, dynamic> map) {
+    return Participant(
+      id: map['id'],
+      name: map['name'],
+      course: map['course'],
+      year: map['year'],
+    );
+  }
+}
+
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
@@ -69,7 +101,12 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
   Future _createDB(Database db, int version) async {
@@ -86,7 +123,34 @@ CREATE TABLE events (
   isRecorded $boolType
   )
 ''');
+
+    await db.execute('''
+CREATE TABLE participants (
+  id $idType,
+  name $textType,
+  course $textType,
+  year $textType
+)
+''');
   }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+      const textType = 'TEXT NOT NULL';
+      
+      await db.execute('''
+CREATE TABLE participants (
+  id $idType,
+  name $textType,
+  course $textType,
+  year $textType
+)
+''');
+    }
+  }
+
+  // --- Events CRUD ---
 
   Future<Event> create(Event event) async {
     final db = await instance.database;
@@ -133,6 +197,34 @@ CREATE TABLE events (
 
     return await db.delete(
       'events',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- Participants CRUD ---
+
+  Future<Participant> createParticipant(Participant participant) async {
+    final db = await instance.database;
+    final id = await db.insert('participants', participant.toMap());
+    return Participant(
+        id: id,
+        name: participant.name,
+        course: participant.course,
+        year: participant.year
+    );
+  }
+  
+  Future<List<Participant>> readAllParticipants() async {
+    final db = await instance.database;
+    final result = await db.query('participants', orderBy: 'name ASC');
+    return result.map((json) => Participant.fromMap(json)).toList();
+  }
+
+  Future<int> deleteParticipant(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'participants',
       where: 'id = ?',
       whereArgs: [id],
     );
