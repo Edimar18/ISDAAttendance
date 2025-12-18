@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:csv/csv.dart';
 import 'db_helper.dart';
 
 class AttendancePage extends StatefulWidget {
@@ -68,6 +72,41 @@ class _AttendancePageState extends State<AttendancePage> {
     _refreshAttendance();
   }
 
+  Future<void> _exportCSV() async {
+    try {
+      final records = await DatabaseHelper.instance.getAttendanceForEvent(widget.event.id!);
+      
+      List<List<dynamic>> csvData = [
+        ['Name', 'Time In', 'Time Out']
+      ];
+
+      for (var record in records) {
+        csvData.add([
+          record.participant?.name ?? 'Unknown',
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(record.timeIn),
+          record.timeOut != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(record.timeOut!) : 'N/A'
+        ]);
+      }
+
+      String csvString = const ListToCsvConverter().convert(csvData);
+      
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'attendance_${widget.event.title.replaceAll(' ', '_')}.csv';
+      final file = await File('${tempDir.path}/$fileName').create();
+      await file.writeAsString(csvString);
+
+      if (mounted) {
+         // Share the file
+         await Share.shareXFiles([XFile(file.path)], text: 'Attendance for ${widget.event.title}');
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error exporting CSV: $e')));
+      }
+    }
+  }
+
   void _toggleSort() {
     setState(() {
       _sortByTimeInAsc = !_sortByTimeInAsc;
@@ -88,6 +127,11 @@ class _AttendancePageState extends State<AttendancePage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            onPressed: _exportCSV,
+            icon: const Icon(Icons.file_download),
+            tooltip: 'Export CSV',
+          ),
           IconButton(
             onPressed: _timeOutAll,
             icon: const Icon(Icons.timer_off),
@@ -163,7 +207,7 @@ class _AttendanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('hh:mm a');
+    // final dateFormat = DateFormat('hh:mm a'); // Unused
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
