@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'db_helper.dart';
 
 void main() {
@@ -51,17 +52,22 @@ class _EventsPageState extends State<EventsPage> {
     });
   }
 
-  void _showAddEventModal(BuildContext context) async {
+  void _showAddEventModal(BuildContext context, {Event? event}) async {
     final result = await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const AddEventModal(),
+      builder: (context) => AddEventModal(event: event),
     );
 
     if (result == true) {
       _refreshEvents();
     }
+  }
+
+  Future<void> _deleteEvent(int id) async {
+    await DatabaseHelper.instance.delete(id);
+    _refreshEvents();
   }
 
   Future<void> _toggleAttendance(Event event) async {
@@ -99,14 +105,40 @@ class _EventsPageState extends State<EventsPage> {
             itemCount: events.length,
             itemBuilder: (context, index) {
               final event = events[index];
-              return GestureDetector(
-                onTap: () => _toggleAttendance(event),
-                child: EventCard(
-                  title: event.title,
-                  tag: event.type,
-                  tagColor: _getTagColor(event.type),
-                  date: event.date,
-                  isRecorded: event.isRecorded,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Slidable(
+                  endActionPane: ActionPane(
+                    motion: const ScrollMotion(),
+                    children: [
+                      SlidableAction(
+                        onPressed: (context) => _showAddEventModal(context, event: event),
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        icon: Icons.edit,
+                        label: 'Edit',
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                      ),
+                      SlidableAction(
+                        onPressed: (context) => _deleteEvent(event.id!),
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        icon: Icons.delete,
+                        label: 'Delete',
+                        borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                      ),
+                    ],
+                  ),
+                  child: GestureDetector(
+                    onTap: () => _toggleAttendance(event),
+                    child: EventCard(
+                      title: event.title,
+                      tag: event.type,
+                      tagColor: _getTagColor(event.type),
+                      date: event.date,
+                      isRecorded: event.isRecorded,
+                    ),
+                  ),
                 ),
               );
             },
@@ -141,7 +173,8 @@ class _EventsPageState extends State<EventsPage> {
 }
 
 class AddEventModal extends StatefulWidget {
-  const AddEventModal({super.key});
+  final Event? event;
+  const AddEventModal({super.key, this.event});
 
   @override
   State<AddEventModal> createState() => _AddEventModalState();
@@ -149,7 +182,7 @@ class AddEventModal extends StatefulWidget {
 
 class _AddEventModalState extends State<AddEventModal> {
   late DateTime selectedDate;
-  final _titleController = TextEditingController();
+  late TextEditingController _titleController;
   String? _selectedType;
   
   final List<String> _eventTypes = [
@@ -160,14 +193,16 @@ class _AddEventModalState extends State<AddEventModal> {
     'Scholar Meeting',
     'Seminar',
     'Workshop',
-    'Fundraising',
+    'Fundraising'
     'Other',
   ];
 
   @override
   void initState() {
     super.initState();
-    selectedDate = DateTime.now();
+    selectedDate = widget.event?.date ?? DateTime.now();
+    _titleController = TextEditingController(text: widget.event?.title);
+    _selectedType = widget.event?.type;
   }
 
   @override
@@ -258,7 +293,7 @@ class _AddEventModalState extends State<AddEventModal> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("New Event", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
+              Text(widget.event == null ? "New Event" : "Edit Event", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF1A1C1E))),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: CircleAvatar(
@@ -305,7 +340,7 @@ class _AddEventModalState extends State<AddEventModal> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 0,
           ),
-          child: const Text("Create Event", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          child: Text(widget.event == null ? "Create Event" : "Update Event", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         ),
       ),
     );
@@ -318,14 +353,23 @@ class _AddEventModalState extends State<AddEventModal> {
       return;
     }
 
-    final event = Event(
-      title: _titleController.text,
-      type: _selectedType!,
-      date: selectedDate,
-      isRecorded: false,
-    );
-
-    await DatabaseHelper.instance.create(event);
+    if (widget.event == null) {
+      final event = Event(
+        title: _titleController.text,
+        type: _selectedType!,
+        date: selectedDate,
+        isRecorded: false,
+      );
+      await DatabaseHelper.instance.create(event);
+    } else {
+      final updatedEvent = widget.event!.copyWith(
+        title: _titleController.text,
+        type: _selectedType!,
+        date: selectedDate,
+      );
+      await DatabaseHelper.instance.update(updatedEvent);
+    }
+    
     if (mounted) {
         Navigator.pop(context, true);
     }
@@ -333,61 +377,117 @@ class _AddEventModalState extends State<AddEventModal> {
 }
 
 class EventCard extends StatelessWidget {
+
   final String title;
+
   final String tag;
+
   final Color tagColor;
+
   final DateTime date;
+
   final bool isRecorded;
 
+
+
   const EventCard({
+
     super.key,
+
     required this.title,
+
     required this.tag,
+
     required this.tagColor,
+
     required this.date,
+
     required this.isRecorded,
+
   });
 
+
+
   @override
+
   Widget build(BuildContext context) {
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+
       padding: const EdgeInsets.all(16),
+
       decoration: BoxDecoration(color: const Color(0xFF1C1F26), borderRadius: BorderRadius.circular(16)),
+
       child: Column(
+
         crossAxisAlignment: CrossAxisAlignment.start,
+
         children: [
+
           Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+
           const SizedBox(height: 12),
+
           Row(
+
             children: [
+
               Container(
+
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+
                 decoration: BoxDecoration(color: tagColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+
                 child: Text(tag, style: TextStyle(color: tagColor, fontSize: 12, fontWeight: FontWeight.bold)),
+
               ),
+
               const SizedBox(width: 12),
+
               const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey),
+
               const SizedBox(width: 4),
+
               Text(DateFormat.yMMMd().format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+
             ],
+
           ),
+
           const SizedBox(height: 12),
+
           const Divider(color: Colors.white12),
+
           Row(
+
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
             children: [
+
               Row(
+
                 children: [
+
                   Icon(isRecorded ? Icons.check_circle : Icons.circle, size: 14, color: isRecorded ? Colors.green : Colors.redAccent),
+
                   const SizedBox(width: 8),
+
                   Text(isRecorded ? 'Attendance recorded' : 'No attendance yet', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+
                 ],
+
               ),
+
             ],
+
           ),
+
         ],
+
       ),
+
     );
+
   }
+
 }
