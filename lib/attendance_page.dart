@@ -332,36 +332,23 @@ class _AddAttendeeModalState extends State<_AddAttendeeModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: const Color(0xFF1B61F3),
-        colorScheme: const ColorScheme.light(primary: Color(0xFF1B61F3)),
-        inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        )
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1C1F26),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8F9FB),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          children: [
+      child: Column(
+        children: [
             Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                     children: [
                         const SizedBox(width: 40), // Spacer for centering
-                        const Expanded(child: Center(child: Text("Select Attendee", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)))),
+                        const Expanded(child: Center(child: Text("Select Attendee", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)))),
                          IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close, color: Colors.grey),
+                            icon: const Icon(Icons.close, color: Colors.white70),
                         ),
                     ],
                 ),
@@ -370,9 +357,18 @@ class _AddAttendeeModalState extends State<_AddAttendeeModal> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.black26,
                         hintText: "Search name or course...",
-                        prefixIcon: Icon(Icons.search, color: Colors.grey),
+                        hintStyle: const TextStyle(color: Colors.white38),
+                        prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                 ),
             ),
@@ -381,12 +377,12 @@ class _AddAttendeeModalState extends State<_AddAttendeeModal> {
                 child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredParticipants.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white10),
                     itemBuilder: (context, index) {
                         final p = _filteredParticipants[index];
                         return ListTile(
-                            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text("${p.course} - ${p.year}"),
+                            title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                            subtitle: Text("${p.course} - ${p.year}", style: const TextStyle(color: Colors.grey)),
                             trailing: ElevatedButton(
                                 onPressed: () => _markPresent(p),
                                 style: ElevatedButton.styleFrom(
@@ -403,8 +399,7 @@ class _AddAttendeeModalState extends State<_AddAttendeeModal> {
                     },
                 ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
