@@ -58,7 +58,7 @@ To run this project locally:
 1.  **Prerequisites:** Ensure you have the [Flutter SDK](https://docs.flutter.dev/get-started/install) installed.
 2.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/isdateendance.git
+    git clone https://github.com/Edimar18/isdateendance.git
     cd isdateendance
     ```
 3.  **Install dependencies:**
@@ -71,9 +71,10 @@ To run this project locally:
     ```
 
 ## 📸 Screenshots
-
-*(Add screenshots of your app here: Events Page, Attendance Page, Add Attendee Modal)*
-
+![home.jpeg](images/home.jpeg)
+![participants.jpeg](images/participants.jpeg)
+![attendance.jpeg](images/attendance.jpeg)
+![add_attendance.jpeg](images/add_attendance.jpeg)
 ---
 
 **Developed with ❤️ for the Scholars of Brgy. Tignapoloan.**
